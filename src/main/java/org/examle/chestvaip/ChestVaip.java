@@ -1,0 +1,133 @@
+import org.bukkit.ChatColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+public class ChestVaip extends JavaPlugin implements CommandExecutor {
+
+    private FileConfiguration config;
+    private boolean commandEnabled;
+    private int cooldownSeconds;
+    private String commandName;
+    private String executedCommand;
+    private HashMap<UUID, Long> cooldowns = new HashMap<>();
+
+    @Override
+    public void onEnable() {
+        // Загрузка конфигурации
+        loadConfig();
+
+        // Регистрация команд
+        getCommand(commandName).setExecutor(this);
+        getCommand("cv").setExecutor(this); // Register main command
+
+        getLogger().info("ChestVaip включен.");
+    }
+
+    private void loadConfig() {
+        saveDefaultConfig();
+        config = getConfig();
+
+        commandEnabled = config.getBoolean("command-enabled", true);
+        cooldownSeconds = config.getInt("cooldown-seconds", 3600);
+        commandName = config.getString("command-name", "vaip");
+        executedCommand = config.getString("executed-command", "say %player% использовал команду /vaip!");
+
+        // Сохраняем конфигурацию
+        saveConfig();
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase(commandName)) { // /vaip command
+            if (!(sender instanceof Player)) {
+                sender.sendMessage(ChatColor.RED + "Эта команда может быть выполнена только игроком.");
+                return true;
+            }
+
+            Player player = (Player) sender;
+            UUID playerId = player.getUniqueId();
+            if (!commandEnabled) {
+                player.sendMessage(ChatColor.RED + "Эта команда в данный момент отключена.");
+                return true;
+            }
+
+            if (cooldowns.containsKey(playerId)) {
+                long timeElapsed = System.currentTimeMillis() - cooldowns.get(playerId);
+                long timeLeft = cooldownSeconds * 1000 - timeElapsed;
+
+                if (timeLeft > 0) {
+                    long remainingMinutes = TimeUnit.MILLISECONDS.toMinutes(timeLeft);
+                    long remainingSeconds = TimeUnit.MILLISECONDS.toSeconds(timeLeft) - (remainingMinutes * 60);
+                    player.sendMessage(ChatColor.RED + "Вы сможете использовать эту команду через " + remainingMinutes + " минут " + remainingSeconds + " секунд.");
+                    return true;
+                }
+            }
+
+            // Установка кулдауна
+            cooldowns.put(playerId, System.currentTimeMillis());
+
+            // Выполнение команды из конфига
+            getServer().dispatchCommand(getServer().getConsoleSender(), executedCommand.replace("%player%", player.getName()));
+
+            player.sendMessage(ChatColor.GREEN + "Вы использовали команду " + commandName + "!");
+            return true;
+
+        } else if (command.getName().equalsIgnoreCase("cv")) { // /cv command - Main control command
+            if (!sender.hasPermission("chestvaip.admin")) {
+                sender.sendMessage(ChatColor.RED + "У вас нет прав на эту команду.");
+                return true;
+            }
+
+            if (args.length == 0) {
+                sender.sendMessage(ChatColor.YELLOW + "Использование: /cv <true|false|reload>");
+                sender.sendMessage(ChatColor.YELLOW + "true - Включить команду /vaip");
+                sender.sendMessage(ChatColor.YELLOW + "false - Выключить команду /vaip");
+                sender.sendMessage(ChatColor.YELLOW + "reload - Перезагрузить плагин");
+                return true;
+            }
+
+            String action = args[0].toLowerCase(); // Convert to lowercase for case-insensitive comparison
+
+            switch (action) {
+                case "true": // Enable command
+                    config.set("command-enabled", true);
+                    saveConfig();
+                    commandEnabled = true;
+                    sender.sendMessage(ChatColor.GREEN + "Команда /vaip включена.");
+                    break;
+                case "false": // Disable command
+                    config.set("command-enabled", false);
+                    saveConfig();
+                    commandEnabled = false;
+                    sender.sendMessage(ChatColor.RED + "Команда /vaip выключена.");
+                    break;
+                case "reload": // Reload plugin
+                    reloadConfig();
+                    loadConfig();
+                    sender.sendMessage(ChatColor.GREEN + "Плагин ChestVaip перезагружен.");
+                case "link": // Link to github
+                    sender.sendMessage(ChatColor.YELLOW + "github.com/crashsystem1337z");
+                    break;
+                default:
+                    sender.sendMessage(ChatColor.YELLOW + "Использование: /cv <true|false|reload>");
+                    sender.sendMessage(ChatColor.YELLOW + "true - Включить команду /vaip");
+                    sender.sendMessage(ChatColor.YELLOW + "false - Выключить команду /vaip");
+                    sender.sendMessage(ChatColor.YELLOW + "reload - Перезагрузить плагин");
+                    sender.sendMessage(ChatColor.YELLOW + "help - Помощь по плагину");
+                    sender.sendMessage(ChatColor.YELLOW + "link - github разработчика");
+                    break;
+            }
+            return true;
+        }
+
+        return false;
+    }
+}

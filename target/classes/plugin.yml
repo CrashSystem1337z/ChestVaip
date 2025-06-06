@@ -1,0 +1,18 @@
+name: ChestVaip
+version: 1.0
+main: ChestVaip
+api-version: 1.16
+author: CrashSystem
+website: github.com/crashsystem1337z
+description: предвайп кит или что хотите
+commands:
+  vaip:
+    description: Использование команды.
+    usage: /vaip
+  cv:
+    description: Управление плагином ChestVaip.
+    usage: /cv <true|false|reload|link>
+permissions:
+  chestvaip.admin:
+    description: Разрешение на использование команды /cv.
+    default: op
